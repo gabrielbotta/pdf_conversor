@@ -48,21 +48,53 @@ if opcao == "Juntar múltiplos PDFs":
             st.download_button("Baixar PDF Unido", saida_buffer, "documento_unido.pdf", "application/pdf")
 
 # ---------------------------------------------------------
-# 2. IMAGEM PARA PDF
+# 2. CONVERTER IMAGENS PARA PDF (ÚNICA OU MÚLTIPLAS)
 # ---------------------------------------------------------
 elif opcao == "Converter Imagem para PDF":
-    img_upload = st.file_uploader("Selecione a imagem", type=["png", "jpg", "jpeg", "webp"])
+    imgs_upload = st.file_uploader(
+        "Selecione uma ou mais imagens", 
+        type=["png", "jpg", "jpeg", "webp"], 
+        accept_multiple_files=True
+    )
     
-    if img_upload:
-        st.image(img_upload, caption="Pré-visualização", use_container_width=True)
-        if st.button("Converter para PDF"):
-            img = Image.open(img_upload).convert("RGB")
+    if imgs_upload:
+        st.write(f"**Imagens selecionadas:** {len(imgs_upload)}")
+        
+        # Mostra miniaturas das imagens carregadas
+        cols = st.columns(min(len(imgs_upload), 4))
+        for idx, img_file in enumerate(imgs_upload):
+            with cols[idx % 4]:
+                st.image(img_file, use_container_width=True)
+                
+        if st.button("Converter todas para um único PDF"):
+            lista_imagens = []
+            
+            # Carrega e converte todas as imagens para o formato RGB
+            for img_file in imgs_upload:
+                img = Image.open(img_file).convert("RGB")
+                lista_imagens.append(img)
+            
             saida_buffer = io.BytesIO()
-            img.save(saida_buffer, format="PDF")
+            
+            # A primeira imagem guarda o ficheiro e anexa as restantes como páginas
+            primeira_img = lista_imagens[0]
+            restantes = lista_imagens[1:] if len(lista_imagens) > 1 else []
+            
+            primeira_img.save(
+                saida_buffer, 
+                format="PDF", 
+                save_all=True, 
+                append_images=restantes
+            )
             saida_buffer.seek(0)
             
-            st.success("Imagem convertida!")
-            st.download_button("Baixar PDF", saida_buffer, f"{img_upload.name.rsplit('.', 1)[0]}.pdf", "application/pdf")
+            st.success("PDF compilado com sucesso com todas as imagens!")
+            st.download_button(
+                "Baixar PDF Compilado", 
+                saida_buffer, 
+                "imagens_unidas.pdf", 
+                "application/pdf"
+            )
 
 # ---------------------------------------------------------
 # 3. PDF PARA WORD (.DOCX)
