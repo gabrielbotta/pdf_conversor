@@ -27,9 +27,7 @@ opcao = st.selectbox(
 
 st.divider()
 
-# ---------------------------------------------------------
-# 1. JUNTAR PDFs (usando PdfWriter nativo)
-# ---------------------------------------------------------
+#1. juntar pdfs
 if opcao == "Juntar múltiplos PDFs":
     arquivos = st.file_uploader("Selecione dois ou mais arquivos PDF", type=["pdf"], accept_multiple_files=True)
     
@@ -47,9 +45,7 @@ if opcao == "Juntar múltiplos PDFs":
             st.success("PDFs combinados com sucesso!")
             st.download_button("Baixar PDF Unido", saida_buffer, "documento_unido.pdf", "application/pdf")
 
-# ---------------------------------------------------------
-# 2. CONVERTER IMAGENS PARA PDF (ÚNICA OU MÚLTIPLAS)
-# ---------------------------------------------------------
+# 2. imagens para pdf
 elif opcao == "Converter Imagem para PDF":
     imgs_upload = st.file_uploader(
         "Selecione uma ou mais imagens", 
@@ -96,9 +92,8 @@ elif opcao == "Converter Imagem para PDF":
                 "application/pdf"
             )
 
-# ---------------------------------------------------------
-# 3. PDF PARA WORD (.DOCX)
-# ---------------------------------------------------------
+
+# 3. pdf para word
 elif opcao == "Converter PDF para Word (DOCX)":
     pdf_upload = st.file_uploader("Envie o PDF para transformar em Word", type=["pdf"])
     
@@ -124,9 +119,7 @@ elif opcao == "Converter PDF para Word (DOCX)":
             st.success("Arquivo Word gerado com sucesso!")
             st.download_button("Baixar Word (.docx)", dados_docx, f"{pdf_upload.name.rsplit('.', 1)[0]}.docx", "application/vnd.openxmlformats-officedocument.wordprocessingml.document")
 
-# ---------------------------------------------------------
-# 4. COMPRIMIR PDF
-# ---------------------------------------------------------
+# 4. comprimir pdf
 elif opcao == "Comprimir PDF":
     pdf_upload = st.file_uploader("Selecione o PDF para comprimir", type=["pdf"])
     qualidade = st.slider("Qualidade das imagens embutidas (%)", min_value=30, max_value=90, value=65)
@@ -146,9 +139,8 @@ elif opcao == "Comprimir PDF":
             st.success("PDF comprimido!")
             st.download_button("Baixar PDF Comprimido", saida_buffer, f"comprimido_{pdf_upload.name}", "application/pdf")
 
-# ---------------------------------------------------------
-# 5. DOCX PARA PDF
-# ---------------------------------------------------------
+
+# 5. docx pra pdf
 elif opcao == "Converter DOCX para PDF":
     docx_upload = st.file_uploader("Selecione o arquivo DOCX", type=["docx"])
     
