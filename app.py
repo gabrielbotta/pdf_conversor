@@ -2,17 +2,10 @@ import io
 import os
 import tempfile
 import streamlit as st
-import fitz
-from PIL import Image
-from pypdf import PdfWriter
-from pdf2docx import Converter
-from reportlab.pdfgen import canvas
-from reportlab.lib.pagesizes import letter
-from docx import Document
 
-st.set_page_config(page_title="BotaPDF", page_icon="📄", layout="centered")
+st.set_page_config(page_title="Mini iLovePDF", page_icon="📄", layout="centered")
 
-st.title("📄 BotaPDF")
+st.title("📄 Mini iLovePDF")
 st.write("Converta, junte e comprima arquivos diretamente no navegador.")
 
 opcao = st.selectbox(
@@ -28,12 +21,16 @@ opcao = st.selectbox(
 
 st.divider()
 
-#1. juntar pdfs
+# ---------------------------------------------------------
+# 1. JUNTAR PDFs
+# ---------------------------------------------------------
 if opcao == "Juntar múltiplos PDFs":
-    arquivos = st.file_uploader("Selecione dois ou mais arquivos PDF", type=["pdf"], accept_multiple_files=True)
+    arquivos = st.file_uploader("Selecione dois ou mais PDFs", type=["pdf"], accept_multiple_files=True)
     
     if arquivos and len(arquivos) > 1:
         if st.button("Juntar Arquivos"):
+            from pypdf import PdfWriter  # Importa só ao clicar
+            
             writer = PdfWriter()
             for arq in arquivos:
                 writer.append(arq)
@@ -46,7 +43,9 @@ if opcao == "Juntar múltiplos PDFs":
             st.success("PDFs combinados com sucesso!")
             st.download_button("Baixar PDF Unido", saida_buffer, "documento_unido.pdf", "application/pdf")
 
-# 2. imagens para pdf
+# ---------------------------------------------------------
+# 2. IMAGEM PARA PDF
+# ---------------------------------------------------------
 elif opcao == "Converter Imagem para PDF":
     imgs_upload = st.file_uploader(
         "Selecione uma ou mais imagens", 
@@ -56,52 +55,38 @@ elif opcao == "Converter Imagem para PDF":
     
     if imgs_upload:
         st.write(f"**Imagens selecionadas:** {len(imgs_upload)}")
-        
-        # Mostra miniaturas das imagens carregadas
         cols = st.columns(min(len(imgs_upload), 4))
         for idx, img_file in enumerate(imgs_upload):
             with cols[idx % 4]:
                 st.image(img_file, use_container_width=True)
                 
         if st.button("Converter todas para um único PDF"):
-            lista_imagens = []
+            from PIL import Image  # Importa só ao clicar
             
-            # Carrega e converte todas as imagens para o formato RGB
-            for img_file in imgs_upload:
-                img = Image.open(img_file).convert("RGB")
-                lista_imagens.append(img)
-            
+            lista_imagens = [Image.open(f).convert("RGB") for f in imgs_upload]
             saida_buffer = io.BytesIO()
             
-            # A primeira imagem guarda o ficheiro e anexa as restantes como páginas
             primeira_img = lista_imagens[0]
             restantes = lista_imagens[1:] if len(lista_imagens) > 1 else []
             
-            primeira_img.save(
-                saida_buffer, 
-                format="PDF", 
-                save_all=True, 
-                append_images=restantes
-            )
+            primeira_img.save(saida_buffer, format="PDF", save_all=True, append_images=restantes)
             saida_buffer.seek(0)
             
-            st.success("PDF compilado com sucesso com todas as imagens!")
-            st.download_button(
-                "Baixar PDF Compilado", 
-                saida_buffer, 
-                "imagens_unidas.pdf", 
-                "application/pdf"
-            )
+            st.success("PDF compilado com sucesso!")
+            st.download_button("Baixar PDF", saida_buffer, "imagens_unidas.pdf", "application/pdf")
 
-
-# 3. pdf para word
+# ---------------------------------------------------------
+# 3. PDF PARA WORD (.DOCX) - O mais pesado
+# ---------------------------------------------------------
 elif opcao == "Converter PDF para Word (DOCX)":
     pdf_upload = st.file_uploader("Envie o PDF para transformar em Word", type=["pdf"])
     
     if pdf_upload:
         if st.button("Converter para DOCX"):
+            from pdf2docx import Converter  # Carrega apenas se for converter
+            
             with tempfile.NamedTemporaryFile(delete=False, suffix=".pdf") as temp_pdf:
-                temp_pdf.write(pdf_upload.read())
+                temp_pdf.write(pdf_upload.getvalue())
                 temp_pdf_path = temp_pdf.name
             
             docx_path = temp_pdf_path.replace(".pdf", ".docx")
@@ -114,56 +99,59 @@ elif opcao == "Converter PDF para Word (DOCX)":
                 with open(docx_path, "rb") as f:
                     dados_docx = f.read()
             
-            os.remove(temp_pdf_path)
-            os.remove(docx_path)
+            if os.path.exists(temp_pdf_path):
+                os.remove(temp_pdf_path)
+            if os.path.exists(docx_path):
+                os.remove(docx_path)
             
             st.success("Arquivo Word gerado com sucesso!")
-            st.download_button("Baixar Word (.docx)", dados_docx, f"{pdf_upload.name.rsplit('.', 1)[0]}.docx", "application/vnd.openxmlformats-officedocument.wordprocessingml.document")
+            st.download_button(
+                "Baixar Word (.docx)", 
+                dados_docx, 
+                f"{pdf_upload.name.rsplit('.', 1)[0]}.docx", 
+                "application/vnd.openxmlformats-officedocument.wordprocessingml.document"
+            )
 
+# ---------------------------------------------------------
 # 4. COMPRIMIR PDF
+# ---------------------------------------------------------
 elif opcao == "Comprimir PDF":
     pdf_upload = st.file_uploader("Selecione o PDF para comprimir", type=["pdf"])
     
     nivel = st.select_slider(
         "Nível de compressão",
-        options=["Leve (Melhor qualidade)", "Recomendado", "Extremo (Menor tamanho)"],
+        options=["Leve", "Recomendado", "Extremo"],
         value="Recomendado"
     )
     
     if pdf_upload:
-        tamanho_original = len(pdf_upload.getvalue()) / 1024  
+        pdf_bytes = pdf_upload.getvalue()
+        tamanho_original = len(pdf_bytes) / 1024
         st.info(f"Tamanho original: {tamanho_original:.1f} KB")
         
         if st.button("Comprimir PDF"):
-            with st.spinner("Comprimindo documento..."):
-                doc = fitz.open(stream=pdf_upload.read(), filetype="pdf")
+            import fitz  # PyMuPDF carregado apenas na hora
+            
+            with st.spinner("Comprimindo..."):
+                doc = fitz.open(stream=pdf_bytes, filetype="pdf")
+                garbage_val = 3 if nivel == "Leve" else 4
                 
-                if nivel == "Leve (Melhor qualidade)":
-                    deflate = True
-                    garbage = 3
-                elif nivel == "Recomendado":
-                    deflate = True
-                    garbage = 4
-                else:  
-                    deflate = True
-                    garbage = 4
-
                 saida_bytes = doc.tobytes(
-                    garbage=garbage,         
-                    deflate=deflate,         
-                    clean=True,              
-                    deflate_images=True,      
-                    deflate_fonts=True        
+                    garbage=garbage_val,
+                    deflate=True,
+                    clean=True,
+                    deflate_images=True,
+                    deflate_fonts=True
                 )
                 doc.close()
                 
-                tamanho_novo = len(saida_bytes) / 1024  
+                tamanho_novo = len(saida_bytes) / 1024
                 reducao = ((tamanho_original - tamanho_novo) / tamanho_original) * 100
                 
                 if tamanho_novo < tamanho_original:
-                    st.success(f"PDF comprimido! Novo tamanho: {tamanho_novo:.1f} KB (Redução de {reducao:.1f}%)")
+                    st.success(f"Concluído! Redução de {reducao:.1f}%")
                 else:
-                    st.warning("Este arquivo já estava altamente otimizado e não pôde ser reduzido sem perda extrema de dados.")
+                    st.warning("Arquivo já estava no tamanho mínimo possível.")
                 
                 st.download_button(
                     "Baixar PDF Comprimido",
@@ -172,13 +160,18 @@ elif opcao == "Comprimir PDF":
                     "application/pdf"
                 )
 
-
-# 5. docx pra pdf
+# ---------------------------------------------------------
+# 5. DOCX PARA PDF
+# ---------------------------------------------------------
 elif opcao == "Converter DOCX para PDF":
     docx_upload = st.file_uploader("Selecione o arquivo DOCX", type=["docx"])
     
     if docx_upload:
         if st.button("Gerar PDF"):
+            from reportlab.pdfgen import canvas
+            from reportlab.lib.pagesizes import letter
+            from docx import Document
+            
             doc = Document(docx_upload)
             saida_buffer = io.BytesIO()
             c = canvas.Canvas(saida_buffer, pagesize=letter)
@@ -197,5 +190,4 @@ elif opcao == "Converter DOCX para PDF":
             saida_buffer.seek(0)
             
             st.success("PDF gerado!")
-            
             st.download_button("Baixar PDF", saida_buffer, f"{docx_upload.name.rsplit('.', 1)[0]}.pdf", "application/pdf")
