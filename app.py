@@ -112,7 +112,7 @@ elif opcao == "Converter PDF para Word (DOCX)":
                 "application/vnd.openxmlformats-officedocument.wordprocessingml.document"
             )
 # ---------------------------------------------------------
-# 4. COMPRIMIR PDF (Duplo método: Inteligente ou Scanner)
+# 4. COMPRIMIR PDF
 # ---------------------------------------------------------
 elif opcao == "Comprimir PDF":
     pdf_upload = st.file_uploader("Selecione o PDF para comprimir", type=["pdf"])
@@ -120,12 +120,12 @@ elif opcao == "Comprimir PDF":
     modo = st.radio(
         "Tipo de Compressão:",
         ["Manter Texto Selecionável (Digital)", "Compressão Pesada / Scanner (Garantida)"],
-        help="Use 'Compressão Pesada' para documentos escaneados, contratos ou PDFs que insistem em ficar grandes."
+        help="Utilize 'Compressão Pesada' para documentos digitalizados, faturas ou ficheiros que não reduzem de tamanho."
     )
     
     if modo == "Compressão Pesada / Scanner (Garantida)":
         dpi_escolhido = st.select_slider(
-            "Resolução / Qualidade visual:",
+            "Resolução visual:",
             options=[72, 100, 150],
             value=100,
             format_func=lambda x: f"{x} DPI (Leve)" if x == 72 else (f"{x} DPI (Equilibrado)" if x == 100 else f"{x} DPI (Mais nítido)")
@@ -140,19 +140,16 @@ elif opcao == "Comprimir PDF":
             import fitz
             import io
             
-            with st.spinner("Comprimindo documento..."):
+            with st.spinner("A comprimir documento..."):
                 doc = fitz.open(stream=pdf_bytes, filetype="pdf")
                 
-                # MÉTODO 1: RASTERIZAÇÃO (O segredo do iLovePDF para arquivos teimosos)
                 if modo == "Compressão Pesada / Scanner (Garantida)":
                     doc_novo = fitz.open()
                     
                     for page in doc:
-                        # Renderiza a página no DPI selecionado
                         pix = page.get_pixmap(dpi=dpi_escolhido)
                         img_bytes = pix.tobytes("jpeg", jpg_quality=65)
                         
-                        # Cria uma nova página no PDF com as mesmas dimensões da original
                         nova_pag = doc_novo.new_page(width=page.rect.width, height=page.rect.height)
                         nova_pag.insert_image(page.rect, stream=img_bytes)
                     
@@ -163,13 +160,11 @@ elif opcao == "Comprimir PDF":
                     )
                     doc_novo.close()
                     doc.close()
-                
-                # MÉTODO 2: OTIMIZAÇÃO ESTRUTURAL (Mantém texto vetorial)
                 else:
                     saida_bytes = doc.tobytes(
                         garbage=4,
                         deflate=1,
-                        use_objstms=True,  # Agrupa objetos em streams compactados
+                        use_objstms=True,
                         clean=True
                     )
                     doc.close()
@@ -178,10 +173,10 @@ elif opcao == "Comprimir PDF":
                 
                 if tamanho_novo < tamanho_original:
                     reducao = ((tamanho_original - tamanho_novo) / tamanho_original) * 100
-                    st.success(f"🎉 Redução de {reducao:.1f}%! Novo tamanho: {tamanho_novo:.1f} KB")
+                    st.success(f"PDF comprimido! Redução de {reducao:.1f}% ({tamanho_novo:.1f} KB)")
                     arquivo_final = saida_bytes
                 else:
-                    st.warning("O modo Digital não conseguiu reduzir este arquivo específico. Selecione a opção 'Compressão Pesada / Scanner' para forçar a redução.")
+                    st.warning("O modo digital não conseguiu reduzir este documento. Experimente a opção 'Compressão Pesada / Scanner'.")
                     arquivo_final = saida_bytes
                 
                 st.download_button(
@@ -190,7 +185,6 @@ elif opcao == "Comprimir PDF":
                     f"comprimido_{pdf_upload.name}",
                     "application/pdf"
                 )
-
 # ---------------------------------------------------------
 # 5. DOCX PARA PDF
 # ---------------------------------------------------------
