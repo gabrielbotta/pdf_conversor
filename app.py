@@ -3,9 +3,9 @@ import os
 import tempfile
 import streamlit as st
 
-st.set_page_config(page_title="Mini iLovePDF", page_icon="📄", layout="centered")
+st.set_page_config(page_title="BotaPDF", page_icon="📄", layout="centered")
 
-st.title("📄 Mini iLovePDF")
+st.title("📄 BotaPDF")
 st.write("Converta, junte e comprima arquivos diretamente no navegador.")
 
 opcao = st.selectbox(
