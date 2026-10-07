@@ -9,9 +9,9 @@ from reportlab.pdfgen import canvas
 from reportlab.lib.pagesizes import letter
 from docx import Document
 
-st.set_page_config(page_title="Canivete Suíço de PDF", page_icon="📄", layout="centered")
+st.set_page_config(page_title="BotaPDF", page_icon="📄", layout="centered")
 
-st.title("📄 Mini iLovePDF")
+st.title("📄 BotaPDF")
 st.write("Converta, junte e comprima arquivos diretamente no navegador.")
 
 opcao = st.selectbox(
