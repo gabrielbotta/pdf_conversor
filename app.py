@@ -2,6 +2,7 @@ import io
 import os
 import tempfile
 import streamlit as st
+import fitz
 from PIL import Image
 from pypdf import PdfWriter
 from pdf2docx import Converter
@@ -119,25 +120,57 @@ elif opcao == "Converter PDF para Word (DOCX)":
             st.success("Arquivo Word gerado com sucesso!")
             st.download_button("Baixar Word (.docx)", dados_docx, f"{pdf_upload.name.rsplit('.', 1)[0]}.docx", "application/vnd.openxmlformats-officedocument.wordprocessingml.document")
 
-# 4. comprimir pdf
+# 4. COMPRIMIR PDF
 elif opcao == "Comprimir PDF":
     pdf_upload = st.file_uploader("Selecione o PDF para comprimir", type=["pdf"])
-    qualidade = st.slider("Qualidade das imagens embutidas (%)", min_value=30, max_value=90, value=65)
+    
+    nivel = st.select_slider(
+        "Nível de compressão",
+        options=["Leve (Melhor qualidade)", "Recomendado", "Extremo (Menor tamanho)"],
+        value="Recomendado"
+    )
     
     if pdf_upload:
-        if st.button("Comprimir"):
-            writer = PdfWriter(clone_from=pdf_upload)
-            for page in writer.pages:
-                page.compress_content_streams()
-                for img in page.images:
-                    img.replace(img.image, quality=qualidade)
-            
-            saida_buffer = io.BytesIO()
-            writer.write(saida_buffer)
-            saida_buffer.seek(0)
-            
-            st.success("PDF comprimido!")
-            st.download_button("Baixar PDF Comprimido", saida_buffer, f"comprimido_{pdf_upload.name}", "application/pdf")
+        tamanho_original = len(pdf_upload.getvalue()) / 1024  
+        st.info(f"Tamanho original: {tamanho_original:.1f} KB")
+        
+        if st.button("Comprimir PDF"):
+            with st.spinner("Comprimindo documento..."):
+                doc = fitz.open(stream=pdf_upload.read(), filetype="pdf")
+                
+                if nivel == "Leve (Melhor qualidade)":
+                    deflate = True
+                    garbage = 3
+                elif nivel == "Recomendado":
+                    deflate = True
+                    garbage = 4
+                else:  
+                    deflate = True
+                    garbage = 4
+
+                saida_bytes = doc.tobytes(
+                    garbage=garbage,         
+                    deflate=deflate,         
+                    clean=True,              
+                    deflate_images=True,      
+                    deflate_fonts=True        
+                )
+                doc.close()
+                
+                tamanho_novo = len(saida_bytes) / 1024  
+                reducao = ((tamanho_original - tamanho_novo) / tamanho_original) * 100
+                
+                if tamanho_novo < tamanho_original:
+                    st.success(f"PDF comprimido! Novo tamanho: {tamanho_novo:.1f} KB (Redução de {reducao:.1f}%)")
+                else:
+                    st.warning("Este arquivo já estava altamente otimizado e não pôde ser reduzido sem perda extrema de dados.")
+                
+                st.download_button(
+                    "Baixar PDF Comprimido",
+                    saida_bytes,
+                    f"comprimido_{pdf_upload.name}",
+                    "application/pdf"
+                )
 
 
 # 5. docx pra pdf
