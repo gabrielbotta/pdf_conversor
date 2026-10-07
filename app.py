@@ -111,18 +111,25 @@ elif opcao == "Converter PDF para Word (DOCX)":
                 f"{pdf_upload.name.rsplit('.', 1)[0]}.docx", 
                 "application/vnd.openxmlformats-officedocument.wordprocessingml.document"
             )
-
 # ---------------------------------------------------------
-# 4. COMPRIMIR PDF (Reamostragem real de imagens)
+# 4. COMPRIMIR PDF (Duplo método: Inteligente ou Scanner)
 # ---------------------------------------------------------
 elif opcao == "Comprimir PDF":
     pdf_upload = st.file_uploader("Selecione o PDF para comprimir", type=["pdf"])
     
-    nivel = st.select_slider(
-        "Nível de compressão",
-        options=["Leve", "Recomendado", "Extremo"],
-        value="Recomendado"
+    modo = st.radio(
+        "Tipo de Compressão:",
+        ["Manter Texto Selecionável (Digital)", "Compressão Pesada / Scanner (Garantida)"],
+        help="Use 'Compressão Pesada' para documentos escaneados, contratos ou PDFs que insistem em ficar grandes."
     )
+    
+    if modo == "Compressão Pesada / Scanner (Garantida)":
+        dpi_escolhido = st.select_slider(
+            "Resolução / Qualidade visual:",
+            options=[72, 100, 150],
+            value=100,
+            format_func=lambda x: f"{x} DPI (Leve)" if x == 72 else (f"{x} DPI (Equilibrado)" if x == 100 else f"{x} DPI (Mais nítido)")
+        )
     
     if pdf_upload:
         pdf_bytes = pdf_upload.getvalue()
@@ -131,72 +138,54 @@ elif opcao == "Comprimir PDF":
         
         if st.button("Comprimir PDF"):
             import fitz
-            from PIL import Image
             import io
             
-            with st.spinner("Comprimindo imagens e estruturas do PDF..."):
+            with st.spinner("Comprimindo documento..."):
                 doc = fitz.open(stream=pdf_bytes, filetype="pdf")
                 
-                # Define qualidade e escala máxima com base no slider
-                if nivel == "Leve":
-                    qualidade_jpeg = 75
-                    max_dim = 1800
-                elif nivel == "Recomendado":
-                    qualidade_jpeg = 50
-                    max_dim = 1200
-                else:  # Extremo
-                    qualidade_jpeg = 30
-                    max_dim = 800
-
-                # Varre todas as páginas e recomprime imagens embutidas
-                for page in doc:
-                    image_list = page.get_images(full=True)
-                    for img_info in image_list:
-                        xref = img_info[0]
-                        try:
-                            base_image = doc.extract_image(xref)
-                            image_bytes = base_image["image"]
-                            
-                            # Abre com Pillow para redimensionar e compactar
-                            pil_img = Image.open(io.BytesIO(image_bytes))
-                            
-                            # Reduz a resolução se for excessivamente grande
-                            w, h = pil_img.size
-                            if max(w, h) > max_dim:
-                                escala = max_dim / max(w, h)
-                                pil_img = pil_img.resize((int(w * escala), int(h * escala)), Image.Resampling.LANCZOS)
-                            
-                            pil_img = pil_img.convert("RGB")
-                            buffer_img = io.BytesIO()
-                            pil_img.save(buffer_img, format="JPEG", quality=qualidade_jpeg, optimize=True)
-                            
-                            # Substitui a imagem pesada pela comprimida
-                            doc.update_stream(xref, buffer_img.getvalue())
-                        except Exception:
-                            # Se for uma máscara ou formato especial, mantém intacta
-                            continue
-
-                # Salva limpando lixo e compactando a estrutura interna
-                saida_bytes = doc.tobytes(
-                    garbage=4,
-                    deflate=True,
-                    clean=True
-                )
-                doc.close()
+                # MÉTODO 1: RASTERIZAÇÃO (O segredo do iLovePDF para arquivos teimosos)
+                if modo == "Compressão Pesada / Scanner (Garantida)":
+                    doc_novo = fitz.open()
+                    
+                    for page in doc:
+                        # Renderiza a página no DPI selecionado
+                        pix = page.get_pixmap(dpi=dpi_escolhido)
+                        img_bytes = pix.tobytes("jpeg", jpg_quality=65)
+                        
+                        # Cria uma nova página no PDF com as mesmas dimensões da original
+                        nova_pag = doc_novo.new_page(width=page.rect.width, height=page.rect.height)
+                        nova_pag.insert_image(page.rect, stream=img_bytes)
+                    
+                    saida_bytes = doc_novo.tobytes(
+                        garbage=4,
+                        deflate=1,
+                        use_objstms=True
+                    )
+                    doc_novo.close()
+                    doc.close()
+                
+                # MÉTODO 2: OTIMIZAÇÃO ESTRUTURAL (Mantém texto vetorial)
+                else:
+                    saida_bytes = doc.tobytes(
+                        garbage=4,
+                        deflate=1,
+                        use_objstms=True,  # Agrupa objetos em streams compactados
+                        clean=True
+                    )
+                    doc.close()
                 
                 tamanho_novo = len(saida_bytes) / 1024
                 
-                # Trava de segurança: se por acaso o arquivo ficou maior, entrega o original!
                 if tamanho_novo < tamanho_original:
                     reducao = ((tamanho_original - tamanho_novo) / tamanho_original) * 100
-                    st.success(f"🎉 PDF comprimido! Novo tamanho: {tamanho_novo:.1f} KB (Redução de {reducao:.1f}%)")
+                    st.success(f"🎉 Redução de {reducao:.1f}%! Novo tamanho: {tamanho_novo:.1f} KB")
                     arquivo_final = saida_bytes
                 else:
-                    st.warning("⚠️ Este PDF já estava no limite máximo de compressão. Mantemos o arquivo original para não aumentar o peso.")
-                    arquivo_final = pdf_bytes
+                    st.warning("O modo Digital não conseguiu reduzir este arquivo específico. Selecione a opção 'Compressão Pesada / Scanner' para forçar a redução.")
+                    arquivo_final = saida_bytes
                 
                 st.download_button(
-                    "Baixar PDF",
+                    "Baixar PDF Comprimido",
                     arquivo_final,
                     f"comprimido_{pdf_upload.name}",
                     "application/pdf"
