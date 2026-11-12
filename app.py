@@ -4,9 +4,9 @@ import tempfile
 import textwrap
 import streamlit as st
 
-st.set_page_config(page_title="Canivete Suíço de PDF", page_icon="📄", layout="centered")
+st.set_page_config(page_title="BotaPDF", page_icon="📄", layout="centered")
 
-st.title("📄 Mini iLovePDF")
+st.title("📄 BotaPDF")
 st.write("Converta, junte e comprima arquivos diretamente no navegador.")
 
 opcao = st.selectbox(
